@@ -8,3 +8,5 @@ local.settings.json
 *.zip
 .pytest_cache/
 .ruff_cache/
+
+.validation-venv/
