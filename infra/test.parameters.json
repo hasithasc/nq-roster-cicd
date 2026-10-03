@@ -1,0 +1,16 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "envShort":             { "value": "test" },
+    "environmentName":      { "value": "Test/UAT" },
+    "location":             { "value": "canadacentral" },
+    "costCenter":           { "value": "IT-Integration-Demo" },
+    "maskStudentIds":       { "value": true },
+    "maxRosterSize":        { "value": 250 },
+    "maximumInstanceCount": { "value": 3 },
+    "instanceMemoryMB":     { "value": 512 },
+    "workspaceDailyCapGb":  { "value": 1 },
+    "identityName":         { "value": "id-roster-deploy-test" }
+  }
+}

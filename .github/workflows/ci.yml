@@ -1,0 +1,40 @@
+# Runs on every pull request. Nothing reaches main without this going green.
+# Note: this workflow never signs in to Azure, so it is safe on a fork PR.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r src/roster_api/requirements.txt pytest ruff
+      - name: Lint
+        run: ruff check .
+      - name: Unit tests
+        run: pytest
+
+  infrastructure:
+    name: Validate infrastructure and isolation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bicep compiles
+        run: |
+          az bicep install
+          az bicep build --file infra/main.bicep --stdout > /dev/null
+          echo "Bicep template is valid."
+      - name: Deployment targets are this project's own
+        run: bash ./scripts/check-isolation.sh

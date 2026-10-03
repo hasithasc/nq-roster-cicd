@@ -1,0 +1,113 @@
+name: Roll back roster API
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to restore
+        required: true
+        type: choice
+        options: [test, production]
+      release_tag:
+        description: Known-good immutable tag, for example v1.0.0
+        required: true
+      incident_reference:
+        description: Incident or change record authorizing rollback
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  validate-and-package:
+    runs-on: ubuntu-latest
+    outputs:
+      commit: ${{ steps.meta.outputs.commit }}
+      digest: ${{ steps.package.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
+          fetch-depth: 0
+      - name: Require an immutable release tag
+        run: |
+          [[ "${{ inputs.release_tag }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          git describe --exact-match --tags HEAD
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install -r src/roster_api/requirements.txt pytest ruff
+      - run: ruff check . && pytest && bash scripts/check-isolation.sh
+      - id: meta
+        run: echo "commit=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+      - id: package
+        run: |
+          mkdir -p dist
+          cp -r src/roster_api/. dist/
+          (cd dist && zip -qr ../roster-api.zip .)
+          digest=$(sha256sum roster-api.zip | cut -d' ' -f1)
+          echo "$digest  roster-api.zip" > roster-api.sha256
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rollback-${{ github.run_id }}
+          path: |
+            roster-api.zip
+            roster-api.sha256
+
+  rollback:
+    needs: validate-and-package
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ inputs.release_tag }}" }
+      - run: bash scripts/guard-target.sh "${{ vars.AZURE_RESOURCE_GROUP }}"
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - uses: actions/download-artifact@v4
+        with: { name: "rollback-${{ github.run_id }}" }
+      - name: Verify and unpack known-good package
+        run: |
+          echo "${{ needs.validate-and-package.outputs.digest }}  roster-api.zip" | sha256sum --check -
+          mkdir -p dist && unzip -q roster-api.zip -d dist
+      - name: Resolve target and restore environment settings
+        id: infra
+        run: |
+          if [[ "${{ inputs.environment }}" == "production" ]]; then
+            params=infra/prod.parameters.json; expected=Production; masking=true
+          else
+            params=infra/test.parameters.json; expected=Test/UAT; masking=true
+          fi
+          out=$(az deployment group create \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --name "rollback-${{ github.run_number }}" \
+            --template-file infra/main.bicep \
+            --parameters @$params \
+            --parameters appVersion='${{ inputs.release_tag }}' \
+                         gitCommit='${{ needs.validate-and-package.outputs.commit }}' \
+                         buildUtc="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --query properties.outputs -o json)
+          echo "app=$(echo "$out" | jq -r .functionAppName.value)" >> "$GITHUB_OUTPUT"
+          echo "url=$(echo "$out" | jq -r .functionAppUrl.value)" >> "$GITHUB_OUTPUT"
+          echo "expected=$expected" >> "$GITHUB_OUTPUT"
+          echo "masking=$masking" >> "$GITHUB_OUTPUT"
+      - uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ steps.infra.outputs.app }}
+          package: dist
+          remote-build: true
+      - run: bash scripts/smoke-test.sh "${{ steps.infra.outputs.url }}" "${{ needs.validate-and-package.outputs.commit }}" "${{ steps.infra.outputs.expected }}" "${{ steps.infra.outputs.masking }}"
+      - name: Record rollback evidence
+        run: |
+          echo "## Roster API rollback" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Environment: ${{ inputs.environment }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Restored tag: ${{ inputs.release_tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Restored commit: ${{ needs.validate-and-package.outputs.commit }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Incident/change: ${{ inputs.incident_reference }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Requested by: ${{ github.actor }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Verification: passed" >> "$GITHUB_STEP_SUMMARY"
+

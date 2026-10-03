@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+.python_packages/
+bin/
+obj/
+local.settings.json
+*.zip
+.pytest_cache/
+.ruff_cache/

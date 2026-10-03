@@ -1,0 +1,16 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "envShort":             { "value": "prod" },
+    "environmentName":      { "value": "Production" },
+    "location":             { "value": "canadacentral" },
+    "costCenter":           { "value": "IT-Integration-Demo" },
+    "maskStudentIds":       { "value": true },
+    "maxRosterSize":        { "value": 500 },
+    "maximumInstanceCount": { "value": 5 },
+    "instanceMemoryMB":     { "value": 512 },
+    "workspaceDailyCapGb":  { "value": 1 },
+    "identityName":         { "value": "id-roster-deploy-prod" }
+  }
+}

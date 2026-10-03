@@ -1,0 +1,31 @@
+{
+  "_comment": "SYNTHETIC DATA ONLY. No real student information. Learner IDs follow the DEMO-nnnn convention used by the enrolment integration. Class ID numbers are the same canonical keys (term-SUBJECTCATALOG-section).",
+  "classes": {
+    "2271-HCA1010-01": { "name": "Health Care Aide: Foundations", "term": "2271" },
+    "2271-HCA1020-01": { "name": "Health Care Aide: Personal Care", "term": "2271" },
+    "2271-PN1100-01":  { "name": "Practical Nurse: Anatomy and Physiology I", "term": "2271" }
+  },
+  "students": [
+    { "studentId": "DEMO-1001", "name": "Avery Chen",        "classId": "2271-HCA1010-01", "status": "ENROLLED" },
+    { "studentId": "DEMO-1002", "name": "Bilal Rahman",      "classId": "2271-HCA1010-01", "status": "ENROLLED" },
+    { "studentId": "DEMO-1003", "name": "Chantal Dufour",    "classId": "2271-HCA1010-01", "status": "ENROLLED" },
+    { "studentId": "DEMO-1004", "name": "Dmytro Kovalenko",  "classId": "2271-HCA1010-01", "status": "ENROLLED" },
+    { "studentId": "DEMO-1005", "name": "Emeka Obi",         "classId": "2271-HCA1010-01", "status": "ENROLLED" },
+    { "studentId": "DEMO-1006", "name": "Fatima Al-Sayed",   "classId": "2271-HCA1010-01", "status": "ENROLLED" },
+    { "studentId": "DEMO-1007", "name": "Grace Littlechild", "classId": "2271-HCA1010-01", "status": "ENROLLED" },
+    { "studentId": "DEMO-1008", "name": "Hiroshi Tanaka",    "classId": "2271-HCA1010-01", "status": "ENROLLED" },
+    { "studentId": "DEMO-1009", "name": "Ingrid Solberg",    "classId": "2271-HCA1010-01", "status": "DROPPED" },
+    { "studentId": "DEMO-1010", "name": "Jamal Whitfield",   "classId": "2271-HCA1010-01", "status": "WAITLISTED" },
+
+    { "studentId": "DEMO-1011", "name": "Keisha Brown",      "classId": "2271-HCA1020-01", "status": "ENROLLED" },
+    { "studentId": "DEMO-1012", "name": "Liam O'Connor",     "classId": "2271-HCA1020-01", "status": "ENROLLED" },
+    { "studentId": "DEMO-1013", "name": "Mei Lin Zhao",      "classId": "2271-HCA1020-01", "status": "ENROLLED" },
+    { "studentId": "DEMO-1014", "name": "Nadia Hassan",      "classId": "2271-HCA1020-01", "status": "ENROLLED" },
+    { "studentId": "DEMO-1015", "name": "Oluwaseun Adeyemi", "classId": "2271-HCA1020-01", "status": "DROPPED" },
+
+    { "studentId": "DEMO-1016", "name": "Priya Nair",        "classId": "2271-PN1100-01", "status": "ENROLLED" },
+    { "studentId": "DEMO-1017", "name": "Quinn Beaulieu",    "classId": "2271-PN1100-01", "status": "ENROLLED" },
+    { "studentId": "DEMO-1018", "name": "Rosa Martinez",     "classId": "2271-PN1100-01", "status": "ENROLLED" },
+    { "studentId": "DEMO-1019", "name": "Samuel Cardinal",   "classId": "2271-PN1100-01", "status": "WAITLISTED" }
+  ]
+}

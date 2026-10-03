@@ -1,0 +1,3 @@
+# Keep this list minimal. Every package here is installed by the remote build on
+# every deployment, so each one you add makes the demo's deploy step slower.
+azure-functions

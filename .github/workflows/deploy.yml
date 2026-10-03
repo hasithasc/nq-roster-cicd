@@ -1,0 +1,115 @@
+name: Promote roster API
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**/*.md', 'docs/**']
+  workflow_dispatch:
+    inputs:
+      release_ref:
+        description: Commit SHA or release tag to promote
+        required: true
+        default: main
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: promote-roster-api
+  cancel-in-progress: false
+
+env:
+  APP_PATH: src/roster_api
+
+jobs:
+  build:
+    name: Build, test and package once
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      commit: ${{ steps.meta.outputs.commit }}
+      builtUtc: ${{ steps.meta.outputs.builtUtc }}
+      digest: ${{ steps.package.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_ref || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r ${{ env.APP_PATH }}/requirements.txt pytest ruff
+      - run: ruff check .
+      - run: pytest
+      - run: bash ./scripts/check-isolation.sh
+      - name: Capture immutable release identity
+        id: meta
+        run: |
+          echo "version=1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+          echo "builtUtc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      - name: Package application
+        id: package
+        run: |
+          mkdir -p dist
+          cp -r ${{ env.APP_PATH }}/. dist/
+          (cd dist && zip -qr ../roster-api.zip .)
+          digest=$(sha256sum roster-api.zip | cut -d' ' -f1)
+          echo "$digest  roster-api.zip" > roster-api.sha256
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: roster-api-${{ github.run_id }}
+          path: |
+            roster-api.zip
+            roster-api.sha256
+          retention-days: 30
+
+  deploy-dev:
+    name: Deploy Development
+    needs: build
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: development
+      parameter_file: infra/dev.parameters.json
+      expected_environment: Development
+      expected_masking: 'false'
+      version: ${{ needs.build.outputs.version }}
+      commit: ${{ needs.build.outputs.commit }}
+      built_utc: ${{ needs.build.outputs.builtUtc }}
+      digest: ${{ needs.build.outputs.digest }}
+      artifact_name: roster-api-${{ github.run_id }}
+    secrets: inherit
+
+  deploy-test:
+    name: Promote to Test/UAT
+    needs: [build, deploy-dev]
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: test
+      parameter_file: infra/test.parameters.json
+      expected_environment: Test/UAT
+      expected_masking: 'true'
+      version: ${{ needs.build.outputs.version }}
+      commit: ${{ needs.build.outputs.commit }}
+      built_utc: ${{ needs.build.outputs.builtUtc }}
+      digest: ${{ needs.build.outputs.digest }}
+      artifact_name: roster-api-${{ github.run_id }}
+    secrets: inherit
+
+  deploy-prod:
+    name: Promote to Production
+    needs: [build, deploy-test]
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: production
+      parameter_file: infra/prod.parameters.json
+      expected_environment: Production
+      expected_masking: 'true'
+      version: ${{ needs.build.outputs.version }}
+      commit: ${{ needs.build.outputs.commit }}
+      built_utc: ${{ needs.build.outputs.builtUtc }}
+      digest: ${{ needs.build.outputs.digest }}
+      artifact_name: roster-api-${{ github.run_id }}
+    secrets: inherit
+
