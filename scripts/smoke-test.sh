@@ -34,7 +34,15 @@ got_env="$(echo "$ver" | python3 -c 'import json,sys;print(json.load(sys.stdin)[
   echo "::error::Wrong environment configuration. Expected $EXPECT_ENV, the app reports $got_env."; exit 1; }
 echo "  correct build and environment confirmed"
 
-roster="$(curl -fsS "$BASE/api/classes/$CLASS/roster")"
+roster="$(curl \
+  --fail \
+  --silent \
+  --show-error \
+  --retry 12 \
+  --retry-delay 5 \
+  --retry-all-errors \
+  --retry-max-time 120 \
+  "$BASE/api/classes/$CLASS/roster")"
 python3 - "$roster" "$EXPECT_MASKED" <<'PY'
 import json, sys
 body = json.loads(sys.argv[1])
