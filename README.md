@@ -1,54 +1,68 @@
 # Student Roster API — CI/CD demo segment
 
-A small Azure Function App that exists so a 15-minute demo can answer one question:
-**how would college staff promote an integration from Development through Test/UAT into Production, and roll it
-back if it turns out to be wrong?**
+This project is a deliberately small Azure Function App designed to show how a team can move changes from Development to Test/UAT and then to Production, while also proving how to roll back when something goes wrong.
 
-It covers testing, approvals, environment-specific configuration, version control and audit
-history. It is the CI/CD segment of a larger demo; the integration itself is a separate
-piece of work in a separate resource group.
+The application is intentionally simple: it serves synthetic student roster data, exposes environment-specific metadata, and demonstrates modern CI/CD practices without depending on real student data or a complex backend.
 
-> ### Before you touch anything, read [`docs/ISOLATION-RULES.md`](docs/ISOLATION-RULES.md).
-> This project shares an Azure subscription with another presenter's demo. Two scripts in
-> `scripts/` enforce the boundary, and both run in CI.
+## Why this repo exists
 
-## What it does
+The core question this demo answers is:
+
+How do we promote a change safely through multiple environments and recover quickly if the promoted version is wrong?
+
+This repo covers:
+
+- automated validation on pull requests
+- environment-specific configuration
+- controlled approvals before deployment
+- immutable release tags
+- explicit rollback steps
+- proof that the deployed version matches the code shipped
+
+This is the CI/CD portion of a larger demo. The enrollment or integration work is intentionally separated into a different resource group and is not part of this app.
+
+## What the app does
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/health` | Liveness |
-| `GET /api/version` | Which build is live, and in which environment. **The demo's proof instrument** |
-| `GET /api/classes` | The classes this API knows about |
-| `GET /api/classes/{classId}/roster` | The students in one class |
+| `GET /api/health` | Liveness check |
+| `GET /api/version` | Shows which build is live and in which environment. This is the demo’s proof instrument. |
+| `GET /api/classes` | Lists all classes the API knows about |
+| `GET /api/classes/{classId}/roster` | Returns the students in a specific class |
 
-Data is a seeded JSON file — nineteen invented learners across three classes. No real
-student information, no external dependency, nothing to break on demo day.
+The data comes from a seeded JSON file containing synthetic learners across a few classes. No real personal information is used and there are no external dependencies.
 
-`/api/version` reports values stamped by the deployment pipeline, so it cannot disagree
-with what was actually deployed. It is how a promotion and a rollback become visible in one
-second instead of asserted.
+The most important endpoint is `/api/version`. It reports values stamped during deployment, so it cannot disagree with what was actually deployed. In practice, this makes promotion and rollback visible in a single glance instead of relying on manual assertions.
 
-## Documentation, in reading order
+## Architecture at a glance
 
-| File | What it is |
-|---|---|
-| [`docs/ISOLATION-RULES.md`](docs/ISOLATION-RULES.md) | The boundary with the other demo segment, and how it is enforced |
-| [`docs/SETUP.md`](docs/SETUP.md) | One-time setup: resource groups, managed identities, federated credentials, GitHub Environments. Start with Step 0 |
-| [`docs/THE-CHANGE.md`](docs/THE-CHANGE.md) | The prepared four-line change that travels the pipeline, and the bug it carries on purpose |
-| [`docs/SCENARIOS.md`](docs/SCENARIOS.md) | Twenty happy-path, approval, failure, security, audit and rollback scenarios |
-| [`docs/RUN-OF-SHOW.md`](docs/RUN-OF-SHOW.md) | The 15 minutes, minute by minute, including what to pre-stage |
+This project combines a small API with a GitHub Actions-based delivery pipeline:
 
-## Run it locally
+1. Code is written and tested locally.
+2. Pull requests trigger validation in CI.
+3. A build artifact is produced once and reused.
+4. The same artifact is promoted through Development, Test/UAT, and Production.
+5. The app reports version metadata so the team can confirm which build is truly live.
+6. Rollback is handled as a deliberate, tracked action using a known-good release tag.
+
+## Quick start
+
+### Local Python checks
 
 ```bash
-python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
+
 pip install -r src/roster_api/requirements.txt pytest ruff
-pytest                      # 9 tests, well under a second
+pytest
 ruff check .
 bash ./scripts/check-isolation.sh
 ```
 
-To run the app itself you need [Azure Functions Core Tools]:
+### Run the app locally
+
+You need the Azure Functions Core Tools installed first.
 
 ```bash
 cd src/roster_api
@@ -56,59 +70,87 @@ func start
 curl http://localhost:7071/api/classes/2271-HCA1010-01/roster
 ```
 
-[Azure Functions Core Tools]: https://learn.microsoft.com/azure/azure-functions/functions-run-local
+## Project layout
 
-## Repository layout
+```text
+.github/
+  workflows/
+    ci.yml                     Pull request gate: lint, tests, Bicep validation, isolation checks
+    deploy.yml                 Build once and promote across environments
+    deploy-environment.yml     Reusable guarded deployment workflow
+    release.yml                Create an immutable semantic release tag
+    rollback.yml               Restore a known-good build to a protected environment
+  CODEOWNERS                  Required reviewers for the repository
 
+src/
+  roster_api/
+    function_app.py           Azure Function routes and environment handling
+    host.json                 Azure Functions host configuration
+    requirements.txt          Python dependencies
+    data/
+      roster-seed.json        Synthetic roster data
+    shared/
+      roster.py               Pure Python roster logic, unit-testable without Azure
+
+tests/
+  conftest.py                 Shared test fixtures
+  test_roster.py             Unit tests for roster logic and masking
+
+infra/
+  main.bicep                 Infrastructure for one environment
+  *.parameters.json          Development, Test/UAT, and Production settings
+
+scripts/
+  check-isolation.sh          Verifies the deployment target is the correct project
+  guard-target.sh            Refuses deployments that do not match this repository’s boundary
+  smoke-test.sh              Verifies the deployed app responds as expected
+
+README.md                    This file
+pytest.ini                   Pytest configuration
+ruff.toml                    Lint configuration
 ```
-.github/workflows/ci.yml       Pull-request gate: lint, tests, Bicep validation, isolation check
-.github/workflows/deploy.yml   Build once, promote through Development, Test/UAT and Production
-.github/workflows/deploy-environment.yml  Reusable guarded environment deployment
-.github/workflows/release.yml  Test and create an immutable semantic release tag
-.github/workflows/rollback.yml Restore a known-good tag through the protected environment
-.github/CODEOWNERS             Who must review (replace the placeholder)
-src/roster_api/                The Function App
-  function_app.py              HTTP routes
-  shared/roster.py             Roster logic - pure Python, no Azure, unit testable
-  data/roster-seed.json        Synthetic data
-tests/                         Unit tests
-infra/main.bicep               All infrastructure for one environment, self-contained
-infra/*.parameters.json        Separate Development, Test/UAT and Production settings
-scripts/guard-target.sh        Refuses any deployment target that is not this project's
-scripts/check-isolation.sh     Refuses another project's resource names in this repository
-scripts/smoke-test.sh          Post-deployment verification against the real URL
-```
+
+## Documentation in reading order
+
+| File | Purpose |
+|---|---|
+| [docs/SETUP.md](docs/SETUP.md) | One-time setup: resource groups, managed identities, federated credentials, and GitHub environments |
+| [docs/THE-CHANGE.md](docs/THE-CHANGE.md) | A small, intentional bug that travels through the promotion pipeline |
+| [docs/SCENARIOS.md](docs/SCENARIOS.md) | Happy-path, approval, failure, security, and rollback scenarios |
+| [docs/RUN-OF-SHOW.md](docs/RUN-OF-SHOW.md) | A 15-minute demo plan and pre-stage checklist |
 
 ## Design decisions worth knowing
 
-**Flex Consumption, Python 3.12.** The current plan for new Function Apps. It has **no
-deployment slots**, so there is no blue/green swap — the documented recovery path is to
-re-run the last successful pipeline run, which is what the demo shows. That is a feature of
-this story rather than a gap in it: the rollback is a CI/CD capability, not an Azure one.
+### Flex Consumption + Python 3.12
 
-**Build once, deploy many.** One build job produces one artifact; all three environments
-deploy that artifact. Production never gets a rebuild, so the bits in production are the
-bits that passed in Test/UAT.
+This repo uses the modern Azure Functions Flex Consumption model with Python 3.12. It does not rely on deployment slots, so the recovery path is built around re-running a known-good deployment rather than a blue/green swap. That is intentional and is part of the demo story.
 
-**OIDC, not stored credentials.** No publish profile and no Azure password in GitHub. The
-pipeline exchanges a short-lived GitHub token for an Azure one, and Azure only trusts it
-from this repository, for a named environment.
+### Build once, deploy many
 
-**One managed identity per environment.** The Development and Test identities cannot write
-to the Production resource group. Separation is enforced by capability, not convention.
+One build produces one artifact, and that artifact is promoted through each environment. Production is not rebuilt from scratch; it receives the same validated bits that already passed through Test/UAT.
 
-**Explicit rollback.** The rollback workflow accepts only an immutable semantic release
-tag, requires an incident/change reference, passes through the target environment approval
-and verifies the restored application using the live endpoints.
+### OIDC instead of stored credentials
 
-**Anonymous HTTP auth.** Every URL here gets read on screen during the demo, and a function
-key in a visible URL would be worse than exposing invented data. In the real solution this
-sits behind API Management with a subscription key. The compensating control is
-`MASK_STUDENT_IDS`, which is on in production.
+The pipeline uses short-lived GitHub OIDC credentials to authenticate with Azure. There is no stored publish profile or long-lived Azure password in GitHub.
 
-## Verified
+### One managed identity per environment
 
-Unit tests and lint pass; `infra/main.bicep` compiles with Bicep CLI 0.47.16; both guard
-scripts were tested against valid and invalid targets. The workflows have not been executed
-against a live Azure subscription — do that during Step 8 of `docs/SETUP.md` and allow time
-for the federated-credential step to need a second attempt.
+Each environment has a dedicated managed identity with restricted access. Development and Test cannot write to the Production resource group, which enforces separation by capability rather than by convention.
+
+### Explicit rollback
+
+Rollback is not a hidden action. It requires a valid semantic release tag, a reason or incident reference, environment approval, and a live verification check after restore.
+
+### Anonymous HTTP access for demo purposes
+
+These endpoints are intentionally public for demonstration. In a production system, they would normally sit behind API Management. To reduce privacy risk, the app masks student IDs in production by setting `MASK_STUDENT_IDS`.
+
+## Verification status
+
+The repository is set up so that lint, unit tests, and infrastructure validation are enforced in CI. The code and templates are designed to be checked automatically before any promotion is allowed.
+
+> The workflows are not executed against a live Azure subscription in this repository itself; that step is part of the setup process documented in [docs/SETUP.md](docs/SETUP.md).
+
+## Summary
+
+This is a compact but realistic example of how a team can demonstrate safe delivery and fast recovery using Azure Functions, GitHub Actions, environment separation, and clear deployment evidence. The app itself is intentionally simple, but the operational patterns are the focus.
