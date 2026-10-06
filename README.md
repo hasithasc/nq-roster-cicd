@@ -154,3 +154,5 @@ The repository is set up so that lint, unit tests, and infrastructure validation
 ## Summary
 
 This is a compact but realistic example of how a team can demonstrate safe delivery and fast recovery using Azure Functions, GitHub Actions, environment separation, and clear deployment evidence. The app itself is intentionally simple, but the operational patterns are the focus.
+
+##Test
