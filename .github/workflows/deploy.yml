@@ -114,6 +114,8 @@ jobs:
           COMMIT: ${{ needs.build.outputs.commit_full }}
         run: |
           set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch --tags --force
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             tagged_commit=$(git rev-list -n 1 "$TAG")
@@ -163,6 +165,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch --tags --force
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             tagged_commit=$(git rev-list -n 1 "$TAG")
