@@ -94,3 +94,97 @@ jobs:
       expected_masking: 'true'
       version: ${{ needs.build.outputs.version }}
       commit: ${{ needs.build.outputs.commit }}
+      built_utc: ${{ needs.build.outputs.builtUtc }}
+      digest: ${{ needs.build.outputs.digest }}
+      artifact_name: roster-api-${{ github.run_id }}
+    secrets: inherit
+
+  tag-test-release:
+    name: Tag successful Test/UAT release
+    needs: [build, deploy-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.commit_full }}
+          fetch-depth: 0
+      - name: Create immutable Test/UAT tag
+        env:
+          TAG: rc-v${{ needs.build.outputs.version }}
+          COMMIT: ${{ needs.build.outputs.commit_full }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            tagged_commit=$(git rev-list -n 1 "$TAG")
+            [[ "$tagged_commit" == "$COMMIT" ]] || {
+              echo "Tag $TAG already points to a different commit. Refusing to overwrite it."
+              exit 1
+            }
+            echo "Tag $TAG already exists on the deployed commit."
+          else
+            git tag -a "$TAG" "$COMMIT" -m "Roster API Test/UAT release $TAG"
+            git push origin "$TAG"
+          fi
+          echo "### Test/UAT release tag" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tag: $TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: $COMMIT" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Test/UAT deployment and smoke test: passed" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-prod:
+    name: Promote to Production
+    needs: [build, tag-test-release]
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: production
+      parameter_file: infra/prod.parameters.json
+      expected_environment: Production
+      expected_masking: 'true'
+      version: ${{ needs.build.outputs.version }}
+      commit: ${{ needs.build.outputs.commit }}
+      built_utc: ${{ needs.build.outputs.builtUtc }}
+      digest: ${{ needs.build.outputs.digest }}
+      artifact_name: roster-api-${{ github.run_id }}
+    secrets: inherit
+
+  tag-production-release:
+    name: Tag successful Production release
+    needs: [build, deploy-prod]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.commit_full }}
+          fetch-depth: 0
+      - name: Create immutable Production tag and GitHub Release
+        env:
+          TAG: v${{ needs.build.outputs.version }}
+          COMMIT: ${{ needs.build.outputs.commit_full }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            tagged_commit=$(git rev-list -n 1 "$TAG")
+            [[ "$tagged_commit" == "$COMMIT" ]] || {
+              echo "Tag $TAG already points to a different commit. Refusing to overwrite it."
+              exit 1
+            }
+            echo "Tag $TAG already exists on the deployed commit."
+          else
+            git tag -a "$TAG" "$COMMIT" -m "Roster API Production release $TAG"
+            git push origin "$TAG"
+          fi
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "GitHub Release $TAG already exists."
+          else
+            gh release create "$TAG" \
+              --verify-tag \
+              --generate-notes \
+              --title "Roster API $TAG"
+          fi
+          echo "### Production release tag" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tag: $TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: $COMMIT" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Production deployment and smoke test: passed" >> "$GITHUB_STEP_SUMMARY"
