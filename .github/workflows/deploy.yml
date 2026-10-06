@@ -13,7 +13,7 @@ on:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
 
 concurrency:
   group: promote-roster-api
@@ -29,6 +29,7 @@ jobs:
     outputs:
       version: ${{ steps.meta.outputs.version }}
       commit: ${{ steps.meta.outputs.commit }}
+      commit_full: ${{ steps.meta.outputs.commit_full }}
       builtUtc: ${{ steps.meta.outputs.builtUtc }}
       digest: ${{ steps.package.outputs.digest }}
     steps:
@@ -47,6 +48,7 @@ jobs:
         run: |
           echo "version=1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
           echo "commit=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+          echo "commit_full=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "builtUtc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
       - name: Package application
         id: package
@@ -92,24 +94,3 @@ jobs:
       expected_masking: 'true'
       version: ${{ needs.build.outputs.version }}
       commit: ${{ needs.build.outputs.commit }}
-      built_utc: ${{ needs.build.outputs.builtUtc }}
-      digest: ${{ needs.build.outputs.digest }}
-      artifact_name: roster-api-${{ github.run_id }}
-    secrets: inherit
-
-  deploy-prod:
-    name: Promote to Production
-    needs: [build, deploy-test]
-    uses: ./.github/workflows/deploy-environment.yml
-    with:
-      environment: production
-      parameter_file: infra/prod.parameters.json
-      expected_environment: Production
-      expected_masking: 'true'
-      version: ${{ needs.build.outputs.version }}
-      commit: ${{ needs.build.outputs.commit }}
-      built_utc: ${{ needs.build.outputs.builtUtc }}
-      digest: ${{ needs.build.outputs.digest }}
-      artifact_name: roster-api-${{ github.run_id }}
-    secrets: inherit
-

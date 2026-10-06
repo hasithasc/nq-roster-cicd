@@ -12,7 +12,7 @@ Development → Test/UAT → Production. Environment settings change; applicatio
 | S02 | Feature branch changes roster response | Branch, commit and linked work item | Change is traceable before deployment |
 | S03 | Pull request validation | Ruff, pytest, Bicep compile and isolation checks | Merge is blocked until checks pass |
 | S04 | Peer review and branch protection | Reviewer approval and protected `main` | Author cannot bypass review |
-| S05 | Create immutable release | Annotated `vX.Y.Z` tag and GitHub release notes | Approved source has a durable identity |
+| S05 | Create immutable release tags | Automatic `rc-vX.Y.Z` and `vX.Y.Z` tags plus release notes | Successful deployments have durable identities |
 | S06 | Deploy automatically to Development | Workflow job, `/api/version`, full learner IDs | New version is visible in Development |
 | S07 | Reject a bad Development deployment | Failed smoke test and stopped dependency chain | Test and Production never start |
 | S08 | Promote the same artifact to Test/UAT | Matching SHA-256 and commit across jobs | Test receives identical application bits |
@@ -34,13 +34,14 @@ Development → Test/UAT → Production. Environment settings change; applicatio
 1. Create branch `feature/ROSTER-14-enrolled-count`.
 2. Implement the prepared change in `THE-CHANGE.md` and open a pull request.
 3. Show automated tests and infrastructure checks, then obtain peer approval.
-4. Merge to protected `main` and create release `v1.1.0`.
-5. Run **Promote roster API** with `release_ref=v1.1.0`.
+4. Merge to protected `main`; the push starts **Promote roster API**.
+5. After Test/UAT succeeds, show the automatic `rc-vX.Y.Z` release candidate tag.
 6. Show automatic Development deployment and its smoke-test evidence.
 7. Approve Test/UAT, verify masked learner IDs and obtain business acceptance.
 8. Approve Production using a different reviewer.
-9. Verify `/api/version` reports the expected tag/commit and the roster masks IDs.
-10. Compare the SHA-256 value in all three job summaries to prove build-once/deploy-many.
+9. Verify `/api/version` reports the expected version/commit and the roster masks IDs.
+10. Show the automatic Production `vX.Y.Z` tag and GitHub Release, then compare the
+    SHA-256 value in all three job summaries to prove build-once/deploy-many.
 
 ## Defect and rollback demonstration
 
@@ -53,7 +54,8 @@ Development → Test/UAT → Production. Environment settings change; applicatio
 5. After approval, verify `/api/version` shows the restored commit and the old response
    contract has returned.
 6. Show the rollback summary, approver, initiator, timestamp and Azure Activity Log.
-7. Correct the requirement test, create a new release and promote normally.
+7. Correct the requirement test and promote normally; successful deployments create the
+   new Test/UAT and Production tags automatically.
 
 ## Failure scenarios to demonstrate or describe
 
